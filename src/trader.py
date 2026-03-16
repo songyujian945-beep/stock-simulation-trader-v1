@@ -156,9 +156,20 @@ class StockTrader:
             reason="策略买入"
         )
 
-        # 更新账户
+        # 更新账户（正确计算总资产）
         new_cash = available - total_cost
-        self.db.update_account(available_cash=new_cash)
+        new_market_value = self._calculate_market_value() + (shares * price)  # 增加持仓市值
+        new_total_asset = new_cash + new_market_value
+        new_profit = new_total_asset - account['initial_capital']
+        new_profit_rate = (new_profit / account['initial_capital']) * 100 if account['initial_capital'] > 0 else 0
+
+        self.db.update_account(
+            available_cash=new_cash,
+            market_value=new_market_value,
+            total_asset=new_total_asset,
+            total_profit=new_profit,
+            total_profit_rate=new_profit_rate
+        )
 
         return {
             'success': True,
@@ -173,6 +184,16 @@ class StockTrader:
                 'total_cost': total_cost
             }
         }
+
+    def _calculate_market_value(self) -> float:
+        """计算当前持仓总市值"""
+        positions = self.db.get_positions()
+        total_value = 0
+        for pos in positions:
+            # 使用当前价格（如果有）或买入价格
+            current_price = pos.get('current_price') or pos['buy_price']
+            total_value += pos['shares'] * current_price
+        return total_value
 
     # ========== 卖出股票 ==========
 
@@ -222,10 +243,23 @@ class StockTrader:
             reason=f"卖出，收益{profit:.2f}({profit_rate:+.2f}%)"
         )
 
-        # 更新账户
+        # 更新账户（卖出时减少市值）
         account = self.db.get_account()
         new_cash = account['available_cash'] + total_income
-        self.db.update_account(available_cash=new_cash)
+        
+        # 计算新的持仓市值（卖出后减少）
+        new_market_value = self._calculate_market_value() - (shares * position['buy_price'])
+        new_total_asset = new_cash + new_market_value
+        new_profit = new_total_asset - account['initial_capital']
+        new_profit_rate = (new_profit / account['initial_capital']) * 100 if account['initial_capital'] > 0 else 0
+        
+        self.db.update_account(
+            available_cash=new_cash,
+            market_value=new_market_value,
+            total_asset=new_total_asset,
+            total_profit=new_profit,
+            total_profit_rate=new_profit_rate
+        )
 
         return {
             'success': True,
@@ -239,7 +273,10 @@ class StockTrader:
                 'fee': fee['total'],
                 'total_income': total_income,
                 'profit': profit,
-                'profit_rate': profit_rate
+                'profit_rate': profit_rate,
+                'new_cash': new_cash,
+                'new_market_value': new_market_value,
+                'new_total_asset': new_total_asset
             }
         }
 
