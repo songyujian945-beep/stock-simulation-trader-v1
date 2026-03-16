@@ -1,6 +1,6 @@
-# 股票模拟交易系统 v1.0
+# 股票模拟交易系统 v1.5.0
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-1.5.0-blue)
 ![Python](https://img.shields.io/badge/Python-3.9+-green)
 ![Status](https://img.shields.io/badge/status-active-success)
 
@@ -319,4 +319,5 @@ $ python main.py web
 
 _最后更新: 2026-03-16_
 _项目创建: 宋先生的数字分身_
-_版本: v1.0.0_
+_版本: v1.5.0_
+_前端: v1.1 | 后端: v1.5_
