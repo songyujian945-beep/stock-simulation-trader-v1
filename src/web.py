@@ -1,10 +1,8 @@
-#!/usr/bin/env python3
 """
-股票模拟交易系统 - Web服务
+股票模拟交易系统 - Web服务 (优化版)
 """
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
 import json
 import asyncio
 from datetime import datetime
@@ -16,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from trader import StockTrader
 
-app = FastAPI(title="股票模拟交易系统")
+app = FastAPI(title="股票模拟交易系统 v1.1")
 
 # 全局变量
 trader = None
@@ -82,6 +80,11 @@ async def buy_stock(code: str, shares: int = None):
         init_trader()
     
     result = trader.buy_stock(code, shares)
+    
+    # 通知WebSocket客户端
+    if result['success']:
+        await broadcast_update()
+    
     return result
 
 @app.post("/api/sell/{code}")
@@ -91,6 +94,11 @@ async def sell_stock(code: str, shares: int = None):
         init_trader()
     
     result = trader.sell_stock(code, shares)
+    
+    # 通知WebSocket客户端
+    if result['success']:
+        await broadcast_update()
+    
     return result
 
 @app.post("/api/auto-trade")
@@ -178,18 +186,35 @@ async def broadcast_update():
             except:
                 pass
 
-# ========== HTML界面 ==========
+# ========== HTML界面 (优化版) ==========
 
 def generate_html():
-    """生成HTML页面"""
+    """生成HTML页面 - 专业金融UI设计"""
     return """
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>股票模拟交易系统 v1.0</title>
+    <title>股票模拟交易系统 v1.1 - 专业版</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+            --bg-main: #f3f4f6;
+            --bg-card: #ffffff;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --border-color: #e5e7eb;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -198,245 +223,484 @@ def generate_html():
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
+            background: var(--bg-main);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            color: white;
+            padding: 30px 20px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .header-content {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .status-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-badge.trading {
+            background: rgba(16, 185, 129, 0.2);
+            border: 2px solid #10b981;
+        }
+
+        .status-badge.closed {
+            background: rgba(239, 68, 68, 0.2);
+            border: 2px solid #ef4444;
         }
 
         .container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
-        }
-
-        h1 {
-            color: white;
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 2.5em;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            padding: 20px;
         }
 
         .card {
-            background: white;
-            border-radius: 15px;
-            padding: 25px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 24px;
             margin-bottom: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
         }
 
-        .card h2 {
-            color: #333;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #667eea;
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
         }
 
-        /* 账户概览 */
-        .account-grid {
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .card-title {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* 账户概览网格 */
+        .metrics-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
         }
 
-        .account-item {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+        .metric-card {
+            background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
             padding: 20px;
-            border-radius: 10px;
-            text-align: center;
+            border-radius: 12px;
+            border-left: 4px solid var(--primary);
+            transition: all 0.3s;
         }
 
-        .account-item .label {
-            font-size: 14px;
-            opacity: 0.9;
+        .metric-card:hover {
+            transform: scale(1.02);
+        }
+
+        .metric-card.profit {
+            border-left-color: var(--success);
+            background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%);
+        }
+
+        .metric-card.loss {
+            border-left-color: var(--danger);
+            background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%);
+        }
+
+        .metric-label {
+            color: var(--text-secondary);
+            font-size: 0.9em;
             margin-bottom: 8px;
+            font-weight: 500;
         }
 
-        .account-item .value {
-            font-size: 24px;
-            font-weight: bold;
+        .metric-value {
+            font-size: 2em;
+            font-weight: 700;
+            color: var(--text-primary);
+            font-family: 'Courier New', monospace;
         }
 
-        .profit {
-            color: #10b981;
+        .metric-value.positive {
+            color: var(--success);
         }
 
-        .loss {
-            color: #ef4444;
+        .metric-value.negative {
+            color: var(--danger);
         }
 
         /* 持仓表格 */
-        table {
+        .positions-table {
             width: 100%;
             border-collapse: collapse;
+            margin-top: 15px;
         }
 
-        th, td {
-            padding: 12px;
+        .positions-table th,
+        .positions-table td {
+            padding: 15px;
             text-align: left;
-            border-bottom: 1px solid #e5e7eb;
+            border-bottom: 1px solid var(--border-color);
         }
 
-        th {
+        .positions-table th {
             background: #f9fafb;
             font-weight: 600;
-            color: #374151;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            font-size: 0.85em;
+            letter-spacing: 0.5px;
         }
 
-        tr:hover {
+        .positions-table tbody tr {
+            transition: background 0.2s;
+        }
+
+        .positions-table tbody tr:hover {
             background: #f9fafb;
+        }
+
+        .stock-code {
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .stock-name {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .price {
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+        }
+
+        .change {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        .change.up {
+            background: #ecfdf5;
+            color: var(--success);
+        }
+
+        .change.down {
+            background: #fef2f2;
+            color: var(--danger);
         }
 
         /* 按钮 */
         .btn {
             padding: 10px 20px;
             border: none;
-            border-radius: 5px;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 14px;
+            font-weight: 600;
+            font-size: 0.9em;
             transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
             color: white;
         }
 
         .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-danger {
-            background: #ef4444;
-            color: white;
+            background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
         }
 
         .btn-success {
-            background: #10b981;
+            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
             color: white;
         }
 
-        /* 状态指示 */
-        .status {
-            display: inline-block;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
+        .btn-danger {
+            background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+            color: white;
         }
 
-        .status-trading {
-            background: #d1fae5;
-            color: #065f46;
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.85em;
         }
 
-        .status-closed {
-            background: #fee2e2;
-            color: #991b1b;
+        /* 图表容器 */
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 20px;
         }
 
-        /* 实时更新 */
+        /* 更新时间 */
         .update-time {
-            color: #6b7280;
-            font-size: 12px;
+            color: var(--text-secondary);
+            font-size: 0.85em;
+            text-align: center;
             margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border-color);
         }
 
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #6b7280;
+        /* 动画 */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
         }
 
         /* 响应式 */
         @media (max-width: 768px) {
-            h1 {
-                font-size: 1.8em;
+            .header h1 {
+                font-size: 1.5em;
             }
 
-            .account-grid {
-                grid-template-columns: repeat(2, 1fr);
+            .metrics-grid {
+                grid-template-columns: 1fr;
             }
+
+            .positions-table {
+                font-size: 0.9em;
+            }
+
+            .positions-table th,
+            .positions-table td {
+                padding: 10px;
+            }
+        }
+
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 15px;
+            opacity: 0.3;
+        }
+
+        /* 交易记录时间线 */
+        .transaction-item {
+            padding: 15px;
+            border-left: 3px solid var(--border-color);
+            margin-bottom: 10px;
+            background: #f9fafb;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .transaction-item.buy {
+            border-left-color: var(--success);
+        }
+
+        .transaction-item.sell {
+            border-left-color: var(--danger);
+        }
+
+        .transaction-time {
+            color: var(--text-secondary);
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+
+        .transaction-details {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .transaction-stock {
+            font-weight: 600;
+        }
+
+        .transaction-amount {
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>📈 股票模拟交易系统 v1.0</h1>
-
-        <!-- 交易状态 -->
-        <div class="card">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h2>交易状态</h2>
-                <div>
-                    <span id="trading-status" class="status">加载中...</span>
-                    <button class="btn btn-primary" onclick="autoTrade()">🤖 自动交易</button>
+    <!-- 头部 -->
+    <div class="header">
+        <div class="header-content">
+            <h1>📈 股票模拟交易系统 v1.1</h1>
+            <div class="header-info">
+                <div id="trading-status" class="status-badge closed">
+                    <span>⏳</span>
+                    <span>加载中...</span>
                 </div>
+                <button class="btn btn-primary" onclick="autoTrade()">
+                    <span>🤖</span>
+                    <span>自动交易</span>
+                </button>
             </div>
         </div>
+    </div>
 
+    <div class="container">
         <!-- 账户概览 -->
-        <div class="card">
-            <h2>💰 账户概览</h2>
-            <div class="account-grid" id="account-grid">
-                <div class="loading">加载中...</div>
+        <div class="card fade-in">
+            <div class="card-header">
+                <div class="card-title">
+                    <span>💰</span>
+                    <span>账户概览</span>
+                </div>
             </div>
-            <p class="update-time" id="update-time"></p>
+            <div class="metrics-grid" id="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">总资产</div>
+                    <div class="metric-value" id="total-asset">¥0.00</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">可用资金</div>
+                    <div class="metric-value" id="available-cash">¥0.00</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">持仓市值</div>
+                    <div class="metric-value" id="market-value">¥0.00</div>
+                </div>
+                <div class="metric-card" id="profit-card">
+                    <div class="metric-label">总收益</div>
+                    <div class="metric-value" id="total-profit">¥0.00</div>
+                </div>
+                <div class="metric-card" id="profit-rate-card">
+                    <div class="metric-label">收益率</div>
+                    <div class="metric-value" id="profit-rate">0.00%</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">初始资金</div>
+                    <div class="metric-value" id="initial-capital">¥50,000</div>
+                </div>
+            </div>
+            <div class="update-time" id="update-time">
+                最后更新: --
+            </div>
         </div>
 
         <!-- 持仓列表 -->
-        <div class="card">
-            <h2>📊 当前持仓 (<span id="position-count">0</span>只)</h2>
-            <table id="positions-table">
-                <thead>
-                    <tr>
-                        <th>股票代码</th>
-                        <th>股票名称</th>
-                        <th>买入价</th>
-                        <th>现价</th>
-                        <th>持仓数</th>
-                        <th>市值</th>
-                        <th>收益</th>
-                        <th>收益率</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody id="positions-body">
-                    <tr>
-                        <td colspan="9" class="loading">加载中...</td>
-                    </tr>
-                </tbody>
-            </table>
+        <div class="card fade-in">
+            <div class="card-header">
+                <div class="card-title">
+                    <span>📊</span>
+                    <span>当前持仓 (<span id="position-count">0</span>只)</span>
+                </div>
+            </div>
+            <div id="positions-container">
+                <table class="positions-table">
+                    <thead>
+                        <tr>
+                            <th>股票代码</th>
+                            <th>股票名称</th>
+                            <th>买入价</th>
+                            <th>现价</th>
+                            <th>持仓</th>
+                            <th>市值</th>
+                            <th>收益</th>
+                            <th>收益率</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="positions-body">
+                    </tbody>
+                </table>
+            </div>
         </div>
 
-        <!-- 交易记录 -->
-        <div class="card">
-            <h2>📝 最近交易</h2>
-            <table id="transactions-table">
-                <thead>
-                    <tr>
-                        <th>时间</th>
-                        <th>股票</th>
-                        <th>类型</th>
-                        <th>价格</th>
-                        <th>数量</th>
-                        <th>金额</th>
-                        <th>手续费</th>
-                        <th>原因</th>
-                    </tr>
-                </thead>
-                <tbody id="transactions-body">
-                    <tr>
-                        <td colspan="8" class="loading">加载中...</td>
-                    </tr>
-                </tbody>
-            </table>
+        <!-- 收益图表 -->
+        <div class="card fade-in">
+            <div class="card-header">
+                <div class="card-title">
+                    <span>📈</span>
+                    <span>收益曲线</span>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="profit-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- 最近交易 -->
+        <div class="card fade-in">
+            <div class="card-header">
+                <div class="card-title">
+                    <span>📝</span>
+                    <span>最近交易</span>
+                </div>
+            </div>
+            <div id="transactions-container">
+            </div>
         </div>
     </div>
 
     <script>
         let ws;
+        let profitChart;
 
         // 初始化
         document.addEventListener('DOMContentLoaded', function() {
@@ -445,16 +709,58 @@ def generate_html():
             loadTransactions();
             loadTradingStatus();
             connectWebSocket();
+            initChart();
         });
 
-        // 连接WebSocket
+        // 初始化图表
+        function initChart() {
+            const ctx = document.getElementById('profit-chart').getContext('2d');
+            profitChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '总资产',
+                        data: [],
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            ticks: {
+                                callback: function(value) {
+                                    return '¥' + value.toLocaleString();
+                                }
+                            }
+                        },
+                        x: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        // WebSocket连接
         function connectWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
 
             ws.onmessage = function(event) {
                 const data = JSON.parse(event.data);
-                if (data.type === 'update') {
+                if (data.type === 'update' || data.type === 'init') {
                     updateDisplay(data.data);
                 }
             };
@@ -479,38 +785,62 @@ def generate_html():
 
         // 显示账户信息
         function displayAccount(account) {
-            const grid = document.getElementById('account-grid');
-            const profitClass = account.total_profit >= 0 ? 'profit' : 'loss';
+            document.getElementById('total-asset').textContent = 
+                '¥' + formatNumber(account.total_asset);
+            document.getElementById('available-cash').textContent = 
+                '¥' + formatNumber(account.available_cash);
+            document.getElementById('market-value').textContent = 
+                '¥' + formatNumber(account.market_value);
+            document.getElementById('initial-capital').textContent = 
+                '¥' + formatNumber(account.initial_capital);
 
-            grid.innerHTML = `
-                <div class="account-item">
-                    <div class="label">总资产</div>
-                    <div class="value">¥${formatNumber(account.total_asset)}</div>
-                </div>
-                <div class="account-item">
-                    <div class="label">可用资金</div>
-                    <div class="value">¥${formatNumber(account.available_cash)}</div>
-                </div>
-                <div class="account-item">
-                    <div class="label">持仓市值</div>
-                    <div class="value">¥${formatNumber(account.market_value)}</div>
-                </div>
-                <div class="account-item">
-                    <div class="label">总收益</div>
-                    <div class="value ${profitClass}">¥${formatNumber(account.total_profit)}</div>
-                </div>
-                <div class="account-item">
-                    <div class="label">收益率</div>
-                    <div class="value ${profitClass}">${account.total_profit_rate.toFixed(2)}%</div>
-                </div>
-                <div class="account-item">
-                    <div class="label">初始资金</div>
-                    <div class="value">¥${formatNumber(account.initial_capital)}</div>
-                </div>
-            `;
+            // 收益
+            const profit = account.total_profit;
+            const profitRate = account.total_profit_rate;
+            const profitEl = document.getElementById('total-profit');
+            const profitRateEl = document.getElementById('profit-rate');
+            const profitCard = document.getElementById('profit-card');
+            const profitRateCard = document.getElementById('profit-rate-card');
+
+            profitEl.textContent = (profit >= 0 ? '+' : '') + '¥' + formatNumber(profit);
+            profitRateEl.textContent = (profitRate >= 0 ? '+' : '') + profitRate.toFixed(2) + '%';
+
+            if (profit >= 0) {
+                profitEl.className = 'metric-value positive';
+                profitRateEl.className = 'metric-value positive';
+                profitCard.className = 'metric-card profit';
+                profitRateCard.className = 'metric-card profit';
+            } else {
+                profitEl.className = 'metric-value negative';
+                profitRateEl.className = 'metric-value negative';
+                profitCard.className = 'metric-card loss';
+                profitRateCard.className = 'metric-card loss';
+            }
 
             document.getElementById('update-time').textContent = 
-                `最后更新: ${new Date().toLocaleString('zh-CN')}`;
+                '最后更新: ' + new Date().toLocaleString('zh-CN');
+
+            // 更新图表
+            updateChart(account.total_asset);
+        }
+
+        // 更新图表
+        function updateChart(value) {
+            if (!profitChart) return;
+
+            const now = new Date();
+            const label = now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0');
+
+            profitChart.data.labels.push(label);
+            profitChart.data.datasets[0].data.push(value);
+
+            // 保留最近20个点
+            if (profitChart.data.labels.length > 20) {
+                profitChart.data.labels.shift();
+                profitChart.data.datasets[0].data.shift();
+            }
+
+            profitChart.update('none');
         }
 
         // 加载持仓
@@ -532,24 +862,46 @@ def generate_html():
             document.getElementById('position-count').textContent = positions.length;
 
             if (positions.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:#6b7280;">暂无持仓</td></tr>';
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9">
+                            <div class="empty-state">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l4.59-4.58L18 11l-6 6z"/>
+                                </svg>
+                                <div>暂无持仓</div>
+                                <div style="font-size: 0.9em; margin-top: 5px;">点击"自动交易"开始</div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
                 return;
             }
 
             tbody.innerHTML = positions.map(p => {
-                const profitClass = p.profit >= 0 ? 'profit' : 'loss';
+                const currentPrice = p.current_price || p.buy_price;
+                const profit = p.profit || 0;
+                const profitRate = p.profit_rate || 0;
+                const profitClass = profit >= 0 ? 'up' : 'down';
+
                 return `
-                    <tr>
-                        <td>${p.code}</td>
-                        <td><strong>${p.name}</strong></td>
-                        <td>¥${p.buy_price.toFixed(2)}</td>
-                        <td>¥${(p.current_price || p.buy_price).toFixed(2)}</td>
+                    <tr class="fade-in">
+                        <td><span class="stock-code">${p.code}</span></td>
+                        <td><span class="stock-name">${p.name}</span></td>
+                        <td class="price">¥${p.buy_price.toFixed(2)}</td>
+                        <td class="price">¥${currentPrice.toFixed(2)}</td>
                         <td>${p.shares}股</td>
-                        <td>¥${formatNumber(p.market_value || p.shares * p.buy_price)}</td>
-                        <td class="${profitClass}">¥${formatNumber(p.profit)}</td>
-                        <td class="${profitClass}">${p.profit_rate.toFixed(2)}%</td>
+                        <td class="price">¥${formatNumber(p.market_value || p.shares * currentPrice)}</td>
+                        <td class="change ${profitClass}">
+                            ${profit >= 0 ? '+' : ''}¥${formatNumber(profit)}
+                        </td>
+                        <td class="change ${profitClass}">
+                            ${profitRate >= 0 ? '+' : ''}${profitRate.toFixed(2)}%
+                        </td>
                         <td>
-                            <button class="btn btn-danger" onclick="sellStock('${p.code}')">卖出</button>
+                            <button class="btn btn-danger btn-sm" onclick="sellStock('${p.code}')">
+                                卖出
+                            </button>
                         </td>
                     </tr>
                 `;
@@ -571,27 +923,43 @@ def generate_html():
 
         // 显示交易记录
         function displayTransactions(transactions) {
-            const tbody = document.getElementById('transactions-body');
+            const container = document.getElementById('transactions-container');
 
             if (transactions.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#6b7280;">暂无交易记录</td></tr>';
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+                        </svg>
+                        <div>暂无交易记录</div>
+                    </div>
+                `;
                 return;
             }
 
-            tbody.innerHTML = transactions.map(t => {
-                const typeClass = t.type === 'buy' ? 'status-closed' : 'status-trading';
+            container.innerHTML = transactions.map(t => {
+                const typeClass = t.type === 'buy' ? 'buy' : 'sell';
                 const typeText = t.type === 'buy' ? '买入' : '卖出';
+                const typeIcon = t.type === 'buy' ? '📈' : '📉';
+
                 return `
-                    <tr>
-                        <td>${new Date(t.timestamp).toLocaleString('zh-CN')}</td>
-                        <td><strong>${t.name}</strong> (${t.code})</td>
-                        <td><span class="status ${typeClass}">${typeText}</span></td>
-                        <td>¥${t.price.toFixed(2)}</td>
-                        <td>${t.shares}股</td>
-                        <td>¥${formatNumber(t.amount)}</td>
-                        <td>¥${t.fee.toFixed(2)}</td>
-                        <td>${t.reason || '-'}</td>
-                    </tr>
+                    <div class="transaction-item ${typeClass} fade-in">
+                        <div class="transaction-time">
+                            ${new Date(t.timestamp).toLocaleString('zh-CN')}
+                        </div>
+                        <div class="transaction-details">
+                            <div>
+                                <span>${typeIcon}</span>
+                                <span class="transaction-stock">${t.name} (${t.code})</span>
+                                <span style="color: var(--text-secondary); margin-left: 10px;">
+                                    ${typeText} ${t.shares}股 × ¥${t.price.toFixed(2)}
+                                </span>
+                            </div>
+                            <div class="transaction-amount ${typeClass === 'buy' ? 'negative' : 'positive'}">
+                                ${typeClass === 'buy' ? '-' : '+'}¥${formatNumber(t.amount)}
+                            </div>
+                        </div>
+                    </div>
                 `;
             }).join('');
         }
@@ -602,13 +970,19 @@ def generate_html():
                 const res = await fetch('/api/trading-status');
                 const json = await res.json();
                 if (json.success) {
-                    const status = document.getElementById('trading-status');
+                    const statusBadge = document.getElementById('trading-status');
                     if (json.data.is_trading) {
-                        status.className = 'status status-trading';
-                        status.textContent = '🟢 交易中 - ' + json.data.message;
+                        statusBadge.className = 'status-badge trading';
+                        statusBadge.innerHTML = `
+                            <span>🟢</span>
+                            <span>交易中</span>
+                        `;
                     } else {
-                        status.className = 'status status-closed';
-                        status.textContent = '🔴 休市 - ' + json.data.message;
+                        statusBadge.className = 'status-badge closed';
+                        statusBadge.innerHTML = `
+                            <span>🔴</span>
+                            <span>休市</span>
+                        `;
                     }
                 }
             } catch (e) {
@@ -658,7 +1032,7 @@ def generate_html():
         // 格式化数字
         function formatNumber(num) {
             if (num === null || num === undefined) return '0.00';
-            return num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            return num.toFixed(2).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',');
         }
 
         // 定时刷新
@@ -666,7 +1040,7 @@ def generate_html():
             loadAccount();
             loadPositions();
             loadTradingStatus();
-        }, 30000); // 30秒刷新一次
+        }, 30000);
     </script>
 </body>
 </html>
@@ -687,7 +1061,7 @@ if __name__ == "__main__":
     host = web_config.get('host', '127.0.0.1')
     port = web_config.get('port', 8080)
 
-    print(f"🚀 股票模拟交易系统启动")
+    print(f"🚀 股票模拟交易系统 v1.1 启动")
     print(f"📍 访问地址: http://{host}:{port}")
     print(f"📊 初始资金: ¥50,000")
 
