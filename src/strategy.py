@@ -13,8 +13,8 @@ class StockStrategy:
     """选股策略"""
 
     def __init__(self):
-        self.min_price = 5  # 最低股价
-        self.max_price = 100  # 最高股价
+        self.min_price = 1  # 最低股价
+        self.max_price = 60  # 最高股价
         self.min_volume = 100000  # 最小成交量
 
     def get_stock_pool(self, count: int = 20) -> List[Dict]:
@@ -77,18 +77,23 @@ class StockStrategy:
         return score
 
     def _get_fallback_stocks(self) -> List[Dict]:
-        """备用股票池（当API失败时）"""
+        """备用股票池（当API失败时）- 价格1-60元"""
         fallback = [
-            {'code': '600519', 'name': '贵州茅台', 'price': 1800},
-            {'code': '000858', 'name': '五粮液', 'price': 180},
-            {'code': '601318', 'name': '中国平安', 'price': 50},
-            {'code': '600036', 'name': '招商银行', 'price': 35},
-            {'code': '000651', 'name': '格力电器', 'price': 40},
-            {'code': '600276', 'name': '恒瑞医药', 'price': 45},
-            {'code': '000333', 'name': '美的集团', 'price': 60},
-            {'code': '601166', 'name': '兴业银行', 'price': 20},
             {'code': '600030', 'name': '中信证券', 'price': 25},
-            {'code': '601888', 'name': '中国中免', 'price': 100},
+            {'code': '601166', 'name': '兴业银行', 'price': 18},
+            {'code': '601318', 'name': '中国平安', 'price': 45},
+            {'code': '600036', 'name': '招商银行', 'price': 32},
+            {'code': '000651', 'name': '格力电器', 'price': 38},
+            {'code': '600276', 'name': '恒瑞医药', 'price': 42},
+            {'code': '000333', 'name': '美的集团', 'price': 55},
+            {'code': '601688', 'name': '华泰证券', 'price': 15},
+            {'code': '600585', 'name': '海螺水泥', 'price': 28},
+            {'code': '000002', 'name': '万科A', 'price': 12},
+            {'code': '600028', 'name': '中国石化', 'price': 5},
+            {'code': '601288', 'name': '农业银行', 'price': 3},
+            {'code': '601398', 'name': '工商银行', 'price': 5},
+            {'code': '600019', 'name': '宝钢股份', 'price': 6},
+            {'code': '601939', 'name': '建设银行', 'price': 6},
         ]
 
         for stock in fallback:
