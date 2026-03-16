@@ -99,7 +99,7 @@ class StockTrader:
 
     # ========== 买入股票 ==========
 
-    def buy_stock(self, code: str, shares: int = None) -> Dict:
+    def buy_stock(self, code: str, shares: int = None, fallback_price: float = None) -> Dict:
         """买入股票"""
         # 检查交易时间
         is_trading, msg = self.is_trading_time()
@@ -108,6 +108,21 @@ class StockTrader:
 
         # 获取实时价格
         quote = self.get_realtime_price(code)
+        
+        # 降级方案：使用备用价格
+        if not quote and fallback_price:
+            # 从股票池获取名称
+            stocks = self.strategy.get_stock_pool(50)
+            stock_info = next((s for s in stocks if s['code'] == code), None)
+            
+            if stock_info:
+                quote = {
+                    'code': code,
+                    'name': stock_info['name'],
+                    'price': fallback_price,
+                    'change_percent': stock_info.get('change_percent', 0)
+                }
+                print(f"⚠️  使用备用价格: {code} ¥{fallback_price}")
         if not quote:
             return {'success': False, 'message': f'获取{code}行情失败'}
 
@@ -284,7 +299,8 @@ class StockTrader:
                 should_buy, reason = self.strategy.should_buy(stock)
 
                 if should_buy:
-                    result = self.buy_stock(stock['code'])
+                    # 传入备用价格（策略中的价格）
+                    result = self.buy_stock(stock['code'], fallback_price=stock['price'])
                     results['buy'].append({
                         'code': stock['code'],
                         'name': stock['name'],
