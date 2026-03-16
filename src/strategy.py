@@ -99,17 +99,34 @@ class StockStrategy:
         return random.sample(fallback, min(5, len(fallback)))
 
     def should_buy(self, stock: Dict) -> tuple:
-        """判断是否应该买入"""
+        """判断是否应该买入（积极策略）"""
         score = stock.get('score', 0)
         change = stock.get('change_percent', 0)
+        volume = stock.get('volume', 0)
 
-        # 评分高且温和上涨
-        if score > 8 and 0 < change < 3:
-            return True, f"评分{score:.1f}，涨幅{change:.2f}%，技术面良好"
+        # 1. 温和上涨（评分要求降低，更容易买入）
+        if score > 5 and 0 < change < 5:
+            return True, f"温和上涨，评分{score:.1f}，涨幅{change:.2f}%"
 
-        # 超跌反弹
-        if -5 < change < -2:
+        # 2. 超跌反弹（扩大范围）
+        if -7 < change < -1:
             return True, f"超跌反弹机会，跌幅{change:.2f}%"
+
+        # 3. 成交量放大（活跃股）
+        if volume > 500000 and score > 3:
+            return True, f"成交量放大，成交{volume:.0f}股，评分{score:.1f}"
+
+        # 4. 平盘整理（可能突破）
+        if -1 < change < 1 and score > 4:
+            return True, f"平盘整理，可能突破，评分{score:.1f}"
+
+        # 5. 强势上涨（追涨）
+        if 3 < change < 8 and score > 6:
+            return True, f"强势上涨，涨幅{change:.2f}%，评分{score:.1f}"
+
+        # 6. 随机买入（模拟盘可以更积极）
+        if random.random() < 0.3 and score > 2:  # 30%概率买入评分>2的股票
+            return True, f"积极建仓，评分{score:.1f}"
 
         return False, "不符合买入条件"
 
