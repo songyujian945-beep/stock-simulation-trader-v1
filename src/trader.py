@@ -7,12 +7,23 @@ from datetime import datetime, time
 from typing import Dict, List, Optional, Tuple
 import sys
 import os
+import requests
+import re
 
 # 添加src目录到路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from core import DatabaseManager
 from strategy import StockStrategy
+
+# 导入新浪财经价格获取工具
+try:
+    from price_fetcher import get_realtime_price_sina
+    USE_SINA = True
+    print("✅ 使用新浪财经接口（稳定）")
+except ImportError:
+    USE_SINA = False
+    print("⚠️  使用akshare接口（可能需要代理）")
 
 class StockTrader:
     """股票交易引擎"""
@@ -57,14 +68,23 @@ class StockTrader:
     # ========== 获取实时行情 ==========
 
     def get_realtime_price(self, code: str) -> Optional[Dict]:
-        """获取股票实时价格"""
+        """获取股票实时价格（带超时控制）"""
+        # 优先使用新浪财经接口（更稳定）
+        if USE_SINA:
+            return get_realtime_price_sina(code, timeout=5)
+        
+        # 降级到akshare（可能需要代理）
         try:
             df = ak.stock_zh_a_spot_em()
+            
+            if df.empty:
+                return None
+            
             stock = df[df['代码'] == code]
-
+            
             if stock.empty:
                 return None
-
+            
             row = stock.iloc[0]
             return {
                 'code': code,
@@ -99,30 +119,19 @@ class StockTrader:
 
     # ========== 买入股票 ==========
 
-    def buy_stock(self, code: str, shares: int = None, fallback_price: float = None) -> Dict:
-        """买入股票"""
+    def buy_stock(self, code: str, shares: int = None) -> Dict:
+        """买入股票（必须使用实时价格）"""
         # 检查交易时间
         is_trading, msg = self.is_trading_time()
         if not is_trading:
             return {'success': False, 'message': f'无法买入: {msg}'}
 
-        # 获取实时价格
+        # 获取实时价格（必须成功）
         quote = self.get_realtime_price(code)
         
-        # 降级方案：使用备用价格
-        if not quote and fallback_price:
-            # 从股票池获取名称
-            stocks = self.strategy.get_stock_pool(50)
-            stock_info = next((s for s in stocks if s['code'] == code), None)
-            
-            if stock_info:
-                quote = {
-                    'code': code,
-                    'name': stock_info['name'],
-                    'price': fallback_price,
-                    'change_percent': stock_info.get('change_percent', 0)
-                }
-                print(f"⚠️  使用备用价格: {code} ¥{fallback_price}")
+        # 如果获取失败，拒绝交易
+        if not quote:
+            return {'success': False, 'message': f'获取{code}实时价格失败，拒绝交易'}
         if not quote:
             return {'success': False, 'message': f'获取{code}行情失败'}
 
@@ -150,10 +159,14 @@ class StockTrader:
 
         # 执行买入
         self.db.add_position(code, quote['name'], price, shares)
+        
+        # 立即设置当前价格（买入价=当前价）
+        self.db.update_position(code, current_price=price, profit=0, profit_rate=0)
+        
         self.db.add_transaction(
             code, quote['name'], 'buy',
             price, shares, amount, fee['total'],
-            reason="策略买入"
+            reason=f"策略买入 @¥{price:.2f}"
         )
 
         # 更新账户（正确计算总资产）
@@ -198,7 +211,7 @@ class StockTrader:
     # ========== 卖出股票 ==========
 
     def sell_stock(self, code: str, shares: int = None) -> Dict:
-        """卖出股票"""
+        """卖出股票（遵守T+1规则）"""
         # 检查交易时间
         is_trading, msg = self.is_trading_time()
         if not is_trading:
@@ -214,6 +227,17 @@ class StockTrader:
 
         if not position:
             return {'success': False, 'message': f'没有{code}的持仓'}
+
+        # 🔒 T+1规则：检查是否买入当天
+        buy_time = datetime.strptime(position['buy_time'], '%Y-%m-%d %H:%M:%S')
+        now = datetime.now()
+        
+        # 如果买入日期 == 当前日期，拒绝卖出
+        if buy_time.date() == now.date():
+            return {
+                'success': False, 
+                'message': f'T+1限制：{code}今日买入，明日才可卖出'
+            }
 
         # 获取实时价格
         quote = self.get_realtime_price(code)
@@ -295,9 +319,22 @@ class StockTrader:
         if not is_trading:
             return {'success': False, 'message': msg, 'results': results}
 
-        # 1. 检查持仓，判断是否卖出
+        # 1. 检查持仓，判断是否卖出（遵守T+1）
         positions = self.db.get_positions()
         for pos in positions:
+            # 🔒 T+1检查：跳过今天买入的股票
+            buy_time = datetime.strptime(pos['buy_time'], '%Y-%m-%d %H:%M:%S')
+            if buy_time.date() == datetime.now().date():
+                results['hold'].append({
+                    'code': pos['code'],
+                    'name': pos['name'],
+                    'buy_price': pos['buy_price'],
+                    'current_price': pos.get('current_price', pos['buy_price']),
+                    'profit_rate': 0,
+                    'reason': 'T+1限制，今日不可卖出'
+                })
+                continue
+            
             quote = self.get_realtime_price(pos['code'])
             if not quote:
                 continue
@@ -336,8 +373,8 @@ class StockTrader:
                 should_buy, reason = self.strategy.should_buy(stock)
 
                 if should_buy:
-                    # 传入备用价格（策略中的价格）
-                    result = self.buy_stock(stock['code'], fallback_price=stock['price'])
+                    # 必须使用实时价格买入，不传fallback_price
+                    result = self.buy_stock(stock['code'])
                     results['buy'].append({
                         'code': stock['code'],
                         'name': stock['name'],

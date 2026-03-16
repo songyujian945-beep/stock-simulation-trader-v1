@@ -9,6 +9,12 @@ import numpy as np
 from typing import List, Dict, Optional
 import random
 
+# 导入新浪财经API
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from sina_api import SinaStockAPI
+
 class StockStrategy:
     """选股策略"""
 
@@ -16,9 +22,10 @@ class StockStrategy:
         self.min_price = 1  # 最低股价
         self.max_price = 60  # 最高股价
         self.min_volume = 100000  # 最小成交量
+        self.sina_api = SinaStockAPI()  # 使用新浪API
 
     def get_stock_pool(self, count: int = 20) -> List[Dict]:
-        """动态获取股票池"""
+        """动态获取股票池（使用新浪财经API）"""
         try:
             # 获取A股实时行情
             df = ak.stock_zh_a_spot_em()

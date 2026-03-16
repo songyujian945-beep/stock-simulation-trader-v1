@@ -149,10 +149,12 @@ class DatabaseManager:
         """添加持仓"""
         conn = self.get_connection()
         cursor = conn.cursor()
+        # 使用本地时间，不是UTC
+        buy_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cursor.execute("""
-        INSERT INTO positions (code, name, buy_price, shares)
-        VALUES (?, ?, ?, ?)
-        """, (code, name, buy_price, shares))
+        INSERT INTO positions (code, name, buy_price, shares, buy_time)
+        VALUES (?, ?, ?, ?, ?)
+        """, (code, name, buy_price, shares, buy_time))
         conn.commit()
         conn.close()
 
@@ -189,10 +191,12 @@ class DatabaseManager:
         """添加交易记录"""
         conn = self.get_connection()
         cursor = conn.cursor()
+        # 使用本地时间
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cursor.execute("""
-        INSERT INTO transactions (code, name, type, price, shares, amount, fee, reason)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (code, name, trans_type, price, shares, amount, fee, reason))
+        INSERT INTO transactions (code, name, type, price, shares, amount, fee, reason, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (code, name, trans_type, price, shares, amount, fee, reason, timestamp))
         conn.commit()
         conn.close()
 

@@ -202,8 +202,8 @@ def generate_html():
         :root {
             --primary: #2563eb;
             --primary-dark: #1e40af;
-            --success: #10b981;
-            --danger: #ef4444;
+            --success: #ef4444;  /* 改为红色（中国股市：涨=红）*/
+            --danger: #10b981;   /* 改为绿色（中国股市：跌=绿）*/
             --warning: #f59e0b;
             --info: #3b82f6;
             --bg-main: #f3f4f6;
