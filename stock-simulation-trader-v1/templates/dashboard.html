@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>股票模拟交易系统 v1.0.0</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.4.2/echarts.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --success-color: #2ecc71;
+            --danger-color: #e74c3c;
+            --warning-color: #f39c12;
+        }
+
+        body {
+            background-color: #f5f6fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .dashboard-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 0;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            transition: transform 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-card {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .stat-icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .stat-label {
+            color: #6c757d;
+            font-size: 14px;
+        }
+
+        .profit {
+            color: var(--success-color);
+        }
+
+        .loss {
+            color: var(--danger-color);
+        }
+
+        .positions-table {
+            margin-top: 20px;
+        }
+
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+
+        .trading-open {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .trading-closed {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        #profitChart {
+            width: 100%;
+            height: 300px;
+        }
+
+        .auto-update {
+            font-size: 12px;
+            color: #6c757d;
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 头部 -->
+    <div class="dashboard-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h2><i class="fas fa-chart-line"></i> 股票模拟交易系统</h2>
+                    <p class="mb-0">版本 v1.0.0 | 初始资金: ¥50,000</p>
+                </div>
+                <div class="col-md-6 text-end">
+                    <span id="tradingStatus" class="status-badge trading-closed">
+                        <i class="fas fa-circle"></i> 检查中...
+                    </span>
+                    <span id="currentTime" class="ms-3"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 账户统计 -->
+        <div class="row">
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="stat-icon text-primary">
+                        <i class="fas fa-wallet"></i>
+                    </div>
+                    <div class="stat-value" id="totalAsset">¥0</div>
+                    <div class="stat-label">总资产</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="stat-icon text-success">
+                        <i class="fas fa-coins"></i>
+                    </div>
+                    <div class="stat-value" id="availableCash">¥0</div>
+                    <div class="stat-label">可用资金</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="stat-icon text-info">
+                        <i class="fas fa-chart-pie"></i>
+                    </div>
+                    <div class="stat-value" id="marketValue">¥0</div>
+                    <div class="stat-label">持仓市值</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="stat-icon" id="profitIcon">
+                        <i class="fas fa-arrow-up"></i>
+                    </div>
+                    <div class="stat-value" id="totalProfit">¥0</div>
+                    <div class="stat-label" id="totalProfitRate">0%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 持仓明细 -->
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-briefcase"></i> 持仓明细</h5>
+                <small class="auto-update"><i class="fas fa-sync-alt pulse"></i> 实时更新中</small>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover positions-table">
+                        <thead>
+                            <tr>
+                                <th>股票代码</th>
+                                <th>股票名称</th>
+                                <th>买入价格</th>
+                                <th>当前价格</th>
+                                <th>持仓股数</th>
+                                <th>涨幅</th>
+                                <th>持仓收益</th>
+                                <th>收益率</th>
+                                <th>买入时间</th>
+                            </tr>
+                        </thead>
+                        <tbody id="positionsList">
+                            <tr>
+                                <td colspan="9" class="text-center">暂无持仓</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 图表和交易记录 -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-chart-area"></i> 收益走势</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="profitChart"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-history"></i> 最近交易</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="transactionsList"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // WebSocket连接
+        let ws;
+        let profitChart;
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+            ws.onopen = function() {
+                console.log('WebSocket已连接');
+                // 请求初始数据
+                ws.send('update');
+            };
+
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                if (data.type === 'update') {
+                    updateDashboard(data);
+                }
+            };
+
+            ws.onerror = function(error) {
+                console.error('WebSocket错误:', error);
+            };
+
+            ws.onclose = function() {
+                console.log('WebSocket断开，5秒后重连');
+                setTimeout(connectWebSocket, 5000);
+            };
+        }
+
+        function updateDashboard(data) {
+            // 更新账户信息
+            const account = data.account;
+            document.getElementById('totalAsset').textContent = `¥${account.total_asset.toFixed(2)}`;
+            document.getElementById('availableCash').textContent = `¥${account.available_cash.toFixed(2)}`;
+            document.getElementById('marketValue').textContent = `¥${account.market_value.toFixed(2)}`;
+
+            // 更新收益
+            const profit = account.total_profit;
+            const profitRate = account.total_profit_rate;
+            const profitElement = document.getElementById('totalProfit');
+            const profitRateElement = document.getElementById('totalProfitRate');
+            const profitIcon = document.getElementById('profitIcon');
+
+            if (profit >= 0) {
+                profitElement.textContent = `+¥${profit.toFixed(2)}`;
+                profitElement.className = 'stat-value profit';
+                profitRateElement.textContent = `+${profitRate.toFixed(2)}%`;
+                profitRateElement.className = 'stat-label profit';
+                profitIcon.innerHTML = '<i class="fas fa-arrow-up"></i>';
+                profitIcon.className = 'stat-icon text-success';
+            } else {
+                profitElement.textContent = `-¥${Math.abs(profit).toFixed(2)}`;
+                profitElement.className = 'stat-value loss';
+                profitRateElement.textContent = `${profitRate.toFixed(2)}%`;
+                profitRateElement.className = 'stat-label loss';
+                profitIcon.innerHTML = '<i class="fas fa-arrow-down"></i>';
+                profitIcon.className = 'stat-icon text-danger';
+            }
+
+            // 更新持仓列表
+            updatePositionsTable(data.positions);
+
+            // 更新时间
+            document.getElementById('currentTime').textContent = data.timestamp;
+        }
+
+        function updatePositionsTable(positions) {
+            const tbody = document.getElementById('positionsList');
+
+            if (positions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center">暂无持仓</td></tr>';
+                return;
+            }
+
+            let html = '';
+            positions.forEach(p => {
+                const changeClass = p.profit_rate >= 0 ? 'profit' : 'loss';
+                const changeIcon = p.profit_rate >= 0 ? '↑' : '↓';
+
+                html += `
+                    <tr>
+                        <td><strong>${p.code}</strong></td>
+                        <td>${p.name}</td>
+                        <td>¥${p.buy_price.toFixed(2)}</td>
+                        <td>¥${p.current_price ? p.current_price.toFixed(2) : '-'}</td>
+                        <td>${p.shares}</td>
+                        <td class="${changeClass}">
+                            ${p.current_price ? ((p.current_price - p.buy_price) / p.buy_price * 100).toFixed(2) + '%' : '-'}
+                        </td>
+                        <td class="${changeClass}">
+                            ${p.profit ? '¥' + p.profit.toFixed(2) : '-'}
+                        </td>
+                        <td class="${changeClass}">
+                            ${p.profit_rate ? p.profit_rate.toFixed(2) + '%' : '-'}
+                        </td>
+                        <td><small>${p.buy_time}</small></td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+        }
+
+        function initChart() {
+            profitChart = echarts.init(document.getElementById('profitChart'));
+            const option = {
+                title: {
+                    text: '收益走势'
+                },
+                tooltip: {
+                    trigger: 'axis'
+                },
+                xAxis: {
+                    type: 'category',
+                    data: []
+                },
+                yAxis: {
+                    type: 'value',
+                    axisLabel: {
+                        formatter: '¥{value}'
+                    }
+                },
+                series: [{
+                    data: [],
+                    type: 'line',
+                    smooth: true,
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: 'rgba(46, 204, 113, 0.5)' },
+                            { offset: 1, color: 'rgba(46, 204, 113, 0.1)' }
+                        ])
+                    },
+                    lineStyle: {
+                        color: '#2ecc71',
+                        width: 2
+                    }
+                }]
+            };
+            profitChart.setOption(option);
+        }
+
+        function checkTradingStatus() {
+            fetch('/api/trading_status')
+                .then(response => response.json())
+                .then(data => {
+                    const statusElement = document.getElementById('tradingStatus');
+                    if (data.data.is_trading_time) {
+                        statusElement.innerHTML = '<i class="fas fa-circle"></i> 交易中';
+                        statusElement.className = 'status-badge trading-open';
+                    } else {
+                        statusElement.innerHTML = '<i class="fas fa-circle"></i> 休市';
+                        statusElement.className = 'status-badge trading-closed';
+                    }
+                });
+        }
+
+        function loadTransactions() {
+            fetch('/api/transactions?limit=10')
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('transactionsList');
+                    if (data.data.length === 0) {
+                        container.innerHTML = '<p class="text-center text-muted">暂无交易记录</p>';
+                        return;
+                    }
+
+                    let html = '<div class="list-group">';
+                    data.data.forEach(t => {
+                        const typeClass = t.type === 'buy' ? 'text-success' : 'text-danger';
+                        const typeIcon = t.type === 'buy' ? 'fa-arrow-down' : 'fa-arrow-up';
+                        const typeText = t.type === 'buy' ? '买入' : '卖出';
+
+                        html += `
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <span class="${typeClass}"><i class="fas ${typeIcon}"></i> ${typeText}</span>
+                                        <strong>${t.name}</strong> (${t.code})
+                                    </div>
+                                    <small class="text-muted">${t.timestamp}</small>
+                                </div>
+                                <div class="mt-1">
+                                    <small>
+                                        价格: ¥${t.price} | 数量: ${t.shares}股 | 金额: ¥${t.amount.toFixed(2)}
+                                    </small>
+                                </div>
+                                ${t.reason ? `<div class="mt-1"><small class="text-muted">原因: ${t.reason}</small></div>` : ''}
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    container.innerHTML = html;
+                });
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initChart();
+            connectWebSocket();
+            checkTradingStatus();
+            loadTransactions();
+
+            // 定时刷新
+            setInterval(checkTradingStatus, 60000); // 每分钟检查交易状态
+            setInterval(loadTransactions, 30000); // 每30秒刷新交易记录
+            setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send('update');
+                }
+            }, 10000); // 每10秒更新数据
+        });
+    </script>
+</body>
+</html>

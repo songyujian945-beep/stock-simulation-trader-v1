@@ -1,0 +1,31 @@
+{
+  "account": {
+    "initial_capital": 50000,
+    "commission_rate": 0.0003,
+    "stamp_tax": 0.001,
+    "min_commission": 5
+  },
+  "trading": {
+    "market_open_morning": "09:30",
+    "market_close_morning": "11:30",
+    "market_open_afternoon": "13:00",
+    "market_close_afternoon": "15:00",
+    "trading_days": [0, 1, 2, 3, 4]
+  },
+  "strategy": {
+    "max_positions": 5,
+    "position_size": 0.2,
+    "stop_loss": -0.05,
+    "take_profit": 0.1,
+    "rsi_oversold": 30,
+    "rsi_overbought": 70,
+    "volume_surge": 2.0
+  },
+  "database": {
+    "path": "data/stock_trader.db"
+  },
+  "web": {
+    "host": "127.0.0.1",
+    "port": 8080
+  }
+}
