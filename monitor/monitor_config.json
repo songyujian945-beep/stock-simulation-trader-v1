@@ -1,0 +1,13 @@
+{
+  "services": [
+    {
+      "name": "股票模拟交易监控",
+      "check_type": "http",
+      "check_url": "http://localhost:8766/",
+      "workdir": "/Users/syj/.openclaw/workspace/trading",
+      "command": "source ~/.openclaw/venv/bin/activate && python stock_api_server.py > stock_server.log 2>&1 &",
+      "max_retries": 3,
+      "auto_restart": true
+    }
+  ]
+}

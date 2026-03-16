@@ -1,0 +1,137 @@
+{
+  "version": "2.0",
+  "updated": "2026-03-16",
+  "source": "智谱AI模型中心实测",
+  "rules": [
+    {
+      "name": "video-script-free",
+      "description": "短视频文案批量生成（免费）",
+      "keywords": ["视频", "文案", "脚本", "抖音", "短视频", "生成视频", "批量"],
+      "model": "zai/glm-4.7-flash",
+      "reason": "免费、快速、适合批量",
+      "cost_per_1k_tokens": 0,
+      "priority": 1
+    },
+    {
+      "name": "code-generation",
+      "description": "代码编写与审查",
+      "keywords": ["代码", "编程", "函数", "bug", "Python", "JavaScript", "写个", "帮我写代码", "调试"],
+      "model": "zai/glm-4.7-flashx",
+      "reason": "30B参数，性价比高，编码能力强",
+      "cost_per_1k_tokens": 0.0001,
+      "priority": 2
+    },
+    {
+      "name": "complex-code",
+      "description": "复杂代码项目",
+      "keywords": ["重构", "架构", "系统设计", "大项目", "复杂逻辑"],
+      "model": "zai/glm-4.7",
+      "reason": "最强基座模型，编码能力顶尖",
+      "cost_per_1k_tokens": 0.001,
+      "priority": 3
+    },
+    {
+      "name": "daily-chat",
+      "description": "日常对话",
+      "keywords": [],
+      "model": "zai/glm-4.5-air",
+      "reason": "轻量版，高性价比，适合日常",
+      "cost_per_1k_tokens": 0.0001,
+      "priority": 10,
+      "is_default": true
+    },
+    {
+      "name": "simple-task-free",
+      "description": "简单任务（免费）",
+      "keywords": ["简单", "快速", "试试"],
+      "model": "zai/glm-4-flash",
+      "reason": "完全免费",
+      "cost_per_1k_tokens": 0,
+      "priority": 5
+    },
+    {
+      "name": "image-generation-free",
+      "description": "图片生成（免费）",
+      "keywords": ["生成图片", "画图", "封面", "配图"],
+      "model": "zai/cogview-3-flash",
+      "reason": "免费图像生成",
+      "cost_per_1k_tokens": 0,
+      "priority": 1,
+      "is_image_model": true
+    },
+    {
+      "name": "image-with-text",
+      "description": "带文字的图片",
+      "keywords": ["带字", "文字图片", "海报", "标题图"],
+      "model": "zai/glm-image",
+      "reason": "文字渲染精准",
+      "cost_per_1k_tokens": 0.01,
+      "priority": 2,
+      "is_image_model": true
+    },
+    {
+      "name": "vision-analysis-free",
+      "description": "图片分析（免费）",
+      "keywords": ["看图", "图片分析", "识别", "这张图", "截图"],
+      "model": "zai/glm-4.6v-flash",
+      "reason": "免费视觉理解",
+      "cost_per_1k_tokens": 0,
+      "priority": 1,
+      "is_vision_model": true
+    },
+    {
+      "name": "video-generation",
+      "description": "视频生成",
+      "keywords": ["生成视频", "制作视频", "AI视频"],
+      "model": "zai/viduq1-text",
+      "reason": "文本生成视频",
+      "cost_per_generation": 0.5,
+      "priority": 1,
+      "is_video_model": true
+    },
+    {
+      "name": "tts-voice",
+      "description": "语音合成",
+      "keywords": ["配音", "朗读", "语音", "TTS"],
+      "model": "zai/glm-tts",
+      "reason": "自然生动的语音合成",
+      "cost_per_1k_chars": 0.01,
+      "priority": 1,
+      "is_audio_model": true
+    }
+  ],
+  "free_models": [
+    "zai/glm-4.7-flash",
+    "zai/glm-4.6v-flash",
+    "zai/glm-4-flash",
+    "zai/cogview-3-flash"
+  ],
+  "cost_tiers": {
+    "free": "完全免费",
+    "low": "¥0.0001/千tokens",
+    "medium": "¥0.001/千tokens",
+    "high": "¥0.01/千tokens"
+  },
+  "fallback": {
+    "model": "zai/glm-4.5-air",
+    "reason": "默认高性价比模型"
+  },
+  "special_routing": {
+    "image": {
+      "default": "zai/cogview-3-flash",
+      "with_text": "zai/glm-image"
+    },
+    "vision": {
+      "default": "zai/glm-4.6v-flash"
+    },
+    "video": {
+      "text_to_video": "zai/viduq1-text",
+      "image_to_video": "zai/viduq1-image"
+    },
+    "audio": {
+      "tts": "zai/glm-tts",
+      "clone": "zai/glm-tts-clone",
+      "asr": "zai/glm-asr-2512"
+    }
+  }
+}
