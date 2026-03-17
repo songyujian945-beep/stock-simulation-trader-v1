@@ -169,19 +169,24 @@ class StockTrader:
             reason=f"策略买入 @¥{price:.2f}"
         )
 
+        # 计算所有交易手续费
+        total_fees = self.db.get_all_transaction_fees()
+
         # 更新账户（正确计算总资产）
         new_cash = available - total_cost
         new_market_value = self._calculate_market_value() + (shares * price)  # 增加持仓市值
         new_total_asset = new_cash + new_market_value
-        new_profit = new_total_asset - account['initial_capital']
-        new_profit_rate = (new_profit / account['initial_capital']) * 100 if account['initial_capital'] > 0 else 0
+
+        # 正确的总收益 = (总资产 - 初始资金) - 所有手续费
+        total_profit = (new_total_asset - account['initial_capital']) - total_fees
+        total_profit_rate = (total_profit / account['initial_capital']) * 100 if account['initial_capital'] > 0 else 0
 
         self.db.update_account(
             available_cash=new_cash,
             market_value=new_market_value,
             total_asset=new_total_asset,
-            total_profit=new_profit,
-            total_profit_rate=new_profit_rate
+            total_profit=total_profit,
+            total_profit_rate=total_profit_rate
         )
 
         return {
@@ -417,30 +422,34 @@ class StockTrader:
         # 更新账户市值
         account = self.db.get_account()
         total_asset = account['available_cash'] + total_market_value
-        total_profit = total_asset - account['initial_capital']
+
+        # 正确的总收益 = 股票价格变动收益 - 所有卖出手续费
+        # 股票价格变动收益已经包含了买入手续费（负数）
+        # 所以只需要减去卖出手续费
+        total_fees = self.db.get_sell_fees()
+        total_profit = (total_market_value - sum(p['shares'] * p['buy_price'] for p in positions)) - total_fees
+        total_profit_rate = (total_profit / account['initial_capital']) * 100 if account['initial_capital'] > 0 else 0
 
         self.db.update_account(
             market_value=total_market_value,
             total_asset=total_asset,
             total_profit=total_profit,
-            total_profit_rate=(total_profit / account['initial_capital']) * 100
+            total_profit_rate=total_profit_rate
         )
 
     # ========== 获取账户概览 ==========
 
     def get_account_overview(self) -> Dict:
         """获取账户概览"""
+        # 获取当前数据
         account = self.db.get_account()
         positions = self.db.get_positions()
         transactions = self.db.get_transactions(limit=10)
 
-        # 更新持仓价格
+        # 更新持仓价格（这会自动更新总收益）
         self.update_positions()
 
-        # 重新获取更新后的数据
-        account = self.db.get_account()
-        positions = self.db.get_positions()
-
+        # 返回数据
         return {
             'account': account,
             'positions': positions,

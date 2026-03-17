@@ -135,6 +135,24 @@ class DatabaseManager:
         conn.commit()
         conn.close()
 
+    def update_account_v2(self, **kwargs):
+        """更新账户信息（v2版，只更新可用现金）"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        fields = []
+        values = []
+        for key, value in kwargs.items():
+            fields.append(f"{key} = ?")
+            values.append(value)
+
+        values.append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        sql = f"UPDATE account SET {', '.join(fields)}, updated_at = ? WHERE id = 1"
+
+        cursor.execute(sql, values)
+        conn.commit()
+        conn.close()
+
     # 持仓操作
     def get_positions(self) -> List[Dict]:
         """获取所有持仓"""
@@ -212,6 +230,24 @@ class DatabaseManager:
         rows = cursor.fetchall()
         conn.close()
         return [dict(row) for row in rows]
+
+    def get_all_transaction_fees(self) -> float:
+        """获取所有交易手续费总和"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT SUM(fee) FROM transactions WHERE type = 'buy'")
+        total_fees = cursor.fetchone()[0]
+        conn.close()
+        return total_fees if total_fees else 0.0
+
+    def get_sell_fees(self) -> float:
+        """获取所有卖出手续费总和"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT SUM(fee) FROM transactions WHERE type = 'sell'")
+        total_fees = cursor.fetchone()[0]
+        conn.close()
+        return total_fees if total_fees else 0.0
 
     # 股票池
     def add_to_pool(self, code: str, name: str, industry: str = ""):
